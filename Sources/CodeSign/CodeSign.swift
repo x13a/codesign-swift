@@ -186,6 +186,7 @@ public struct CodeSignInformationUtils {
         "com.apple.security.get-task-allow",
         "com.apple.security.cs.disable-library-validation",
         "com.apple.security.cs.allow-dyld-environment-variables",
+        "com.apple.security.cs.allow-unsigned-executable-memory",
     ]
     
     public static func hasHardenedRuntime(
