@@ -5,7 +5,7 @@ import Swift
 // https://opensource.apple.com/source/Security/Security-59754.120.12/OSX/libsecurity_codesigning/lib/
 
 public struct CodeSign {
-    
+
     public enum Error: Swift.Error {
         case osStatus(OSStatus)
     }
@@ -126,12 +126,12 @@ public struct CodeSign {
         from code: SecCode,
         _ flags: SecCSFlags = defaultDynamicSigningInformationFlags
     ) -> Result<[String: Any], Error> {
-        switch copyStaticCode(from: code) {
-        case .success(let staticCode):
-            return copySigningInformation(from: staticCode, flags)
-        case .failure(let err):
-            return .failure(err)
-        }
+        // The API accepts both code types, but Swift imports its parameter as
+        // SecStaticCode. Preserve the dynamic object for dynamic information.
+        return copySigningInformation(
+            from: unsafeBitCast(code, to: SecStaticCode.self),
+            flags
+        )
     }
     
     public static func copyStaticCode(
@@ -168,7 +168,6 @@ public struct CodeSign {
 }
 
 public struct CodeSignRequirementString {
-    
     public static let apple     = "anchor apple"
     public static let developer = "\(apple) generic"
     public static let appStore  = "\(developer) and certificate leaf [subject.CN] = \"Apple Mac OS Application Signing\""
@@ -180,25 +179,25 @@ public struct CodeSignRequirementString {
 
 // https://github.com/securing/SimpleXPCApp/blob/master/SimpleXPCService/ConnectionVerifier.swift
 public struct CodeSignInformationUtils {
-    
     public static let hardenedRuntimeFlag: UInt32 = 0x10000
     public static let dangerousEntitlements = [
         "com.apple.security.get-task-allow",
         "com.apple.security.cs.disable-library-validation",
         "com.apple.security.cs.allow-dyld-environment-variables",
         "com.apple.security.cs.allow-unsigned-executable-memory",
+        "com.apple.security.cs.disable-executable-page-protection",
     ]
     
     public static func hasHardenedRuntime(
         _ information: [String: Any]
     ) -> Bool {
-        guard let flags = information[kSecCodeInfoFlags as String] else {
+        guard let flags = information[kSecCodeInfoFlags as String] as? UInt32 else {
             return false
         }
-        return (flags as! UInt32) & hardenedRuntimeFlag == hardenedRuntimeFlag
+        return flags & hardenedRuntimeFlag == hardenedRuntimeFlag
     }
     
-    public static func checkDangerousEntitlements(
+    public static func hasDangerousEntitlements(
         _ information: [String: Any]
     ) -> Bool {
         guard let entitlements =
@@ -207,12 +206,11 @@ public struct CodeSignInformationUtils {
             return false
         }
         for dangerousEntitlement in dangerousEntitlements {
-            if let entitlement = entitlements[dangerousEntitlement] {
-                if entitlement as! Int == 1 {
-                    return false
-                }
+            guard let enabled = entitlements[dangerousEntitlement] as? Bool else {
+                continue
             }
+            if enabled { return true }
         }
-        return true
+        return false
     }
 }
