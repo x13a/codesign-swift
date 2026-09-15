@@ -1,6 +1,6 @@
 # codesign-swift
 
-Code sign swifty helper.
+Code sign swifty helper
 
 ## Example
 
